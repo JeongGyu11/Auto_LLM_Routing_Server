@@ -3,7 +3,7 @@ import io
 import base64
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware # CORSMiddleware import 추가
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Tuple, Dict, Any
 
@@ -29,12 +29,14 @@ client = genai.Client()
 app = FastAPI(title="LLM 기반 MCP 자동화 서버", version="1.0")
 
 # ==============================================================================
-# 1.1. CORS 설정 (프론트엔드 연결 허용) - [정의 직후 통합]
+# 1.1. CORS 설정 (프론트엔드 연결 허용) - [Vercel HTTPS 주소 추가]
 # ==============================================================================
-# 프론트엔드 (React)가 실행되는 주소를 허용 목록에 추가합니다.
+# Vercel 배포 주소 및 로컬 개발 환경 모두 허용
 origins = [
-    "http://localhost:3000",  # React 개발 서버 주소
-    "http://127.0.0.1:3000",  # 로컬 테스트용
+    "http://localhost:3000",        # 로컬 개발 환경
+    "http://127.0.0.1:3000",        # 로컬 테스트용
+    "https://auto-llm-routing.vercel.app", # Vercel의 주 도메인 (정확한 주소로 변경 필요)
+    "https://*.vercel.app",         # 모든 Vercel 서브 도메인 허용
 ]
 
 app.add_middleware(
@@ -44,8 +46,6 @@ app.add_middleware(
     allow_methods=["*"],  # 모든 HTTP 메서드 허용 (POST, GET 등)
     allow_headers=["*"],  # 모든 헤더 허용
 )
-# ==============================================================================
-
 
 # ==============================================================================
 # 2. 문서 파싱 및 멀티 모달 처리 (천우성 팀원 담당 기능)
@@ -147,7 +147,7 @@ def run_multimodal_pipeline(
     final_prompt = [
         f"--- 최종 지침: {prompt_style} ---",
         f"--- 사용자 요청: {user_request} ---",
-        "위 지침과 사용자 요청을 바탕으로 제공된 문서 내용(텍스트 및 시각 자료)을 활용하여 최종 보고서를 작성하십시오. 시각 자료가 제공되었다면 반드시 그 내용을 분석에 통합해야 합니다."
+        "**최종 결과물은 반드시 사용자 요청({user_request})의 형식과 길이(예: 3줄 요약)를 철저히 준수해야 합니다.** 위 지침과 사용자 요청을 바탕으로 제공된 문서 내용(텍스트 및 시각 자료)을 활용하여 최종 보고서를 작성하십시오. 시각 자료가 제공되었다면 반드시 그 내용을 분석에 통합해야 합니다."
     ]
     
     # final_prompt 리스트를 parts의 시작 부분에 추가하여 컨텍스트 제공
