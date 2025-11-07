@@ -18,12 +18,23 @@ from PIL import Image
 from google import genai
 from google.genai.errors import APIError
 
-# 1. API 키 설정 확인 및 클라이언트 연결
-# 코드를 실행하기 전에 터미널에서 $env:GEMINI_API_KEY="YOUR_KEY"를 반드시 실행해야 합니다.
-if not os.getenv("GEMINI_API_KEY"):
-    raise ValueError("GEMINI_API_KEY 환경 변수가 설정되지 않았습니다.")
+# ==============================================================================
+# 1. API 키 설정 확인 및 클라이언트 연결 (수정됨: 서버 기동 안정성 확보)
+# ==============================================================================
+# Render Exited 128 오류 방지를 위해, 서버 시작 시 오류를 내지 않도록 로직을 변경합니다.
 
-client = genai.Client()
+try:
+    # 환경 변수에서 API 키를 가져옵니다. 키가 없어도 오류를 발생시키지 않습니다.
+    api_key = os.getenv("GEMINI_API_KEY")
+    client = genai.Client(api_key=api_key) 
+    IS_API_KEY_LOADED = bool(api_key) # 키가 유효한지 확인하는 플래그
+    if not IS_API_KEY_LOADED:
+        print("경고: GEMINI_API_KEY 환경 변수가 설정되지 않았습니다. LLM 호출이 실패할 수 있습니다.")
+except Exception as e:
+    client = None
+    IS_API_KEY_LOADED = False
+    print(f"경고: Gemini 클라이언트 초기화 오류. LLM 호출 불가. 상세: {e}")
+
 
 # FastAPI 앱 인스턴스 생성 (MCP 서버의 몸통)
 app = FastAPI(title="LLM 기반 MCP 자동화 서버", version="1.0")
@@ -43,8 +54,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],  # 모든 HTTP 메서드 허용 (POST, GET 등)
-    allow_headers=["*"],  # 모든 헤더 허용
+    allow_methods=["*"],    # 모든 HTTP 메서드 허용 (POST, GET 등)
+    allow_headers=["*"],    # 모든 헤더 허용
 )
 
 # ==============================================================================
@@ -142,6 +153,12 @@ def run_multimodal_pipeline(
     user_request: str
 ) -> Tuple[str, str]:
     """멀티 모달 데이터를 받아 MCP 파이프라인을 실행"""
+
+    # LLM 클라이언트가 유효한지 재확인 (API 키 부재 시 오류 처리)
+    global IS_API_KEY_LOADED, client
+    if not IS_API_KEY_LOADED or client is None:
+        error_msg = "API 키 오류: GEMINI_API_KEY가 서버 환경 변수에 설정되어 있지 않거나 잘못되었습니다."
+        return error_msg, "오류 발생: LLM 클라이언트 초기화 실패."
 
     # 1. 최종 프롬프트 구성 (사용자 요청, 스타일, 데이터 통합)
     final_prompt = [
