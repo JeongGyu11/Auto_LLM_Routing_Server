@@ -1,7 +1,7 @@
 import os
 import io
 import base64
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -56,7 +56,7 @@ async def mcp_rpc(request: Request):
     method = body.get("method")
     req_id = body.get("id")
 
-    # 1) initialize 처리
+    # 1) MCP initialize 처리
     if method == "initialize":
         return {
             "jsonrpc": "2.0",
@@ -73,68 +73,7 @@ async def mcp_rpc(request: Request):
             }
         }
 
-    # 2) tools/list 처리
-    if method == "tools/list":
-        return {
-            "jsonrpc": "2.0",
-            "id": req_id,
-            "result": {
-                "tools": [
-                    {
-                        "name": "process_document_tool",
-                        "description": "문서 및 이미지 파일을 분석하여 보고서 생성",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "fileBase64": { "type": "string" },
-                                "filename": { "type": "string" },
-                                "user_request": { "type": "string" },
-                                "target_tag": { "type": "string" }
-                            },
-                            "required": ["fileBase64", "filename", "user_request", "target_tag"]
-                        }
-                    }
-                ]
-            }
-        }
-
-    # 3) tools/call 처리
-    if method == "tools/call":
-        params = body.get("params", {})
-        tool_name = params.get("name")
-        args = params.get("arguments", {})
-
-        if tool_name == "process_document_tool":
-            # Base64 → 파일 바이트 변환
-            file_bytes = base64.b64decode(args["fileBase64"])
-            filename = args["filename"]
-            user_request = args["user_request"]
-            target_tag = args["target_tag"]
-
-            # 기존 문서 파이프라인 사용
-            extracted_text = extract_text_from_file(file_bytes, filename)
-            parts = create_multimodal_parts(file_bytes, "application/octet-stream", extracted_text)
-            model_name, prompt_style = determine_routing(target_tag)
-
-            final_report, process_log = run_multimodal_pipeline(
-                parts=parts,
-                model_name=model_name,
-                prompt_style=prompt_style,
-                user_request=user_request
-            )
-
-            return {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "result": {
-                    "toolName": tool_name,
-                    "final_report": final_report,
-                    "process_log": process_log,
-                    "model_used": model_name
-                }
-            }
-
-    # 4) 정의되지 않은 메서드
+    # 2) MCP에서 정의하지 않은 메서드일 때
     return {
         "jsonrpc": "2.0",
         "id": req_id,
@@ -143,8 +82,6 @@ async def mcp_rpc(request: Request):
             "message": f"Unknown method: {method}"
         }
     }
-#여기(위)까지 새로 축가한 코드(안될 시 삭제) 
-
 
 # ==============================================================================
 # 1.1. CORS 설정 (프론트엔드 연결 허용) - [Vercel HTTPS 주소 추가]

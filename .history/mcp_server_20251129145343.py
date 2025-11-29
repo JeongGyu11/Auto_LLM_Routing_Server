@@ -1,7 +1,7 @@
 import os
 import io
 import base64
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -145,6 +145,15 @@ async def mcp_rpc(request: Request):
     }
 #여기(위)까지 새로 축가한 코드(안될 시 삭제) 
 
+    # 2) MCP에서 정의하지 않은 메서드일 때
+    return {
+        "jsonrpc": "2.0",
+        "id": req_id,
+        "error": {
+            "code": -32601,
+            "message": f"Unknown method: {method}"
+        }
+    }
 
 # ==============================================================================
 # 1.1. CORS 설정 (프론트엔드 연결 허용) - [Vercel HTTPS 주소 추가]
